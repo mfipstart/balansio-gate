@@ -132,6 +132,8 @@
     color:#fff;text-decoration:none;font-size:14.5px;font-weight:600;
   }
   a.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text);margin-left:8px}
+  /* Кнопка внутри пункта списка — своей строкой, иначе прилипает к тексту */
+  .steps a.btn.small{display:table;margin:10px 0 0;padding:8px 14px;font-size:13.5px;margin-left:0}
   .hidden{display:none !important}
   .foot{margin-top:18px;text-align:center;font-size:12px;color:#5d6875}
   @media (max-width:480px){
@@ -183,19 +185,24 @@
         </svg>
         <h1>Копия создана</h1>
       </div>
-      <p class="lead" id="done-lead">Приватный репозиторий уже в вашем аккаунте. Осталось подключить его к Vercel.</p>
+      <p class="lead" id="done-lead">Репозиторий <code id="repo-name">—</code> создан приватным — проверять ничего не нужно. Осталось два действия.</p>
 
       <ol class="steps">
-        <li>Откройте репозиторий <code id="repo-name">—</code> и убедитесь, что он приватный.</li>
-        <li>Зайдите на <a href="https://vercel.com/new" target="_blank" rel="noopener" style="color:#7aa2ff">vercel.com/new</a>, выберите <b>Import Git Repository</b> и этот репозиторий.</li>
-        <li>В поле <b>Project Name</b> впишите ровно <code id="proj-name">—</code> — тогда адрес колеса будет предсказуемым: <code id="proj-host">—</code></li>
-        <li>Нажмите <b>Deploy</b>. Переменные окружения не нужны — ничего заполнять не надо.</li>
-        <li>Откройте своё колесо, зайдите в <code>/admin</code> и проверьте название проекта и ссылку на ваш Telegram, затем нажмите «Сохранить».</li>
+        <li>
+          <b>Один раз установите Vercel на GitHub.</b> Пока приложения нет, Vercel не видит приватные репозитории, и поиск у него заблокирован — это его правило, не наше.
+          <a class="btn ghost small" href="https://github.com/apps/vercel/installations/new" target="_blank" rel="noopener">Установить Vercel</a>
+        </li>
+        <li>
+          <b>Импортируйте репозиторий</b> на <a href="https://vercel.com/new" target="_blank" rel="noopener" style="color:#7aa2ff">vercel.com/new</a> — он появится в <b>Import Git Repository</b>. Имя проекта оставьте <code id="proj-name">—</code>, тогда адрес колеса будет <code id="proj-host">—</code>. Нажмите <b>Deploy</b>: переменные окружения не нужны.
+        </li>
+        <li>
+          <b>Проверьте подпись.</b> Откройте своё колесо, зайдите в <code>/admin</code>, поправьте название проекта и ссылку на Telegram, нажмите «Сохранить».
+        </li>
       </ol>
 
       <div style="margin-top:22px">
         <a class="btn" id="repo-link" href="#" target="_blank" rel="noopener">Открыть репозиторий</a>
-        <a class="btn ghost" href="https://vercel.com/new" target="_blank" rel="noopener">Vercel Import</a>
+        <a class="btn ghost" href="https://vercel.com/new" target="_blank" rel="noopener">Импорт в Vercel</a>
       </div>
     </div>
 
