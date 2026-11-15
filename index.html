@@ -217,8 +217,9 @@
       </div>
       <h1>Обновить копию</h1>
       <p class="lead">
-        Обновляем <code id="up-repo">—</code> до текущей версии колеса. Ваши настройки —
-        название, ссылка на Telegram, бот — останутся как есть: меняются только файлы приложения.
+        <span id="up-lead-named" class="hidden">Обновляем <code id="up-repo">—</code> до текущей версии колеса.</span>
+        <span id="up-lead-generic">Обновляем копию до текущей версии колеса.</span>
+        Ваши настройки — название, ссылка на Telegram, бот — останутся как есть: меняются только файлы приложения.
       </p>
       <button id="up-go" type="button" disabled>Обновить</button>
       <div class="msg" id="up-msg"></div>
@@ -411,6 +412,21 @@
     upMsg.textContent = text;
   }
 
+  // Имя репозитория показываем только когда оно проверено: иначе «Обновляем — до
+  // текущей версии» читается как ошибка вёрстки.
+  function setUpdateRepo(repo) {
+    var named = $('up-lead-named');
+    var generic = $('up-lead-generic');
+    if (repo) {
+      $('up-repo').textContent = repo;
+      if (named) named.classList.remove('hidden');
+      if (generic) generic.classList.add('hidden');
+    } else {
+      if (named) named.classList.add('hidden');
+      if (generic) generic.classList.remove('hidden');
+    }
+  }
+
   var updateToken = q.get('update') || '';
   var upBtn = $('up-go');
   var upMsg = $('up-msg');
@@ -422,7 +438,7 @@
     $('step-update').classList.remove('hidden');
     updateToken = tok;
     if (knownRepo) {
-      $('up-repo').textContent = knownRepo;
+      setUpdateRepo(knownRepo);
       upBtn.disabled = false;
       return;
     }
@@ -431,9 +447,11 @@
       .then(function (data) {
         if (!data || !data.ok || !data.repo) {
           upMsgShow(UPDATE_ERRORS[data && data.reason] || 'Ссылка на обновление не подошла. Откройте админку и нажмите «Обновить приложение» ещё раз.');
+          // Ссылка не подтвердилась — обновлять по ней нечего, кнопка только путает.
+          upBtn.classList.add('hidden');
           return;
         }
-        $('up-repo').textContent = data.repo;
+        setUpdateRepo(data.repo);
         upBtn.disabled = false;
       })
       .catch(function () {
@@ -513,7 +531,7 @@
     if (err === 'no_access' || err === 'update_failed' || err === 'bad_update_link') {
       $('step-key').classList.add('hidden');
       $('step-update').classList.remove('hidden');
-      if (repoParam) $('up-repo').textContent = repoParam;
+      setUpdateRepo(repoParam);
       upBtn.classList.add('hidden');
       upMsgShow(UPDATE_ERRORS[err] + ' Вернитесь в админку копии и нажмите «Обновить приложение» ещё раз.');
       if (window.history && window.history.replaceState) {
