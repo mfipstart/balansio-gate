@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Получить копию — Колесо жизненного баланса</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235b8cff'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23fff' stroke-width='2'/%3E%3Cpath d='M16 7v9l6 4' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
 <meta name="description" content="Введите ключ доступа, чтобы получить личную копию колеса баланса в своём аккаунте.">
 <meta name="robots" content="noindex">
 <style>
@@ -49,21 +50,39 @@
   h1{font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:650;letter-spacing:-.01em}
   p.lead{margin:0 0 24px;color:var(--muted);font-size:14.5px;line-height:1.55}
   label{display:block;font-size:12.5px;color:var(--muted);margin:0 0 8px;letter-spacing:.02em;text-transform:uppercase}
-  input{
-    width:100%;
+  /* Ключ: «BALANSIO-» — неподвижный префикс, в поле только 12 символов.
+     Так вставка полного ключа и ручной ввод не дают двойного префикса. */
+  .field{
+    display:flex;
+    align-items:center;
     background:#0e1319;
     border:1px solid var(--line);
-    color:var(--text);
     border-radius:12px;
-    padding:15px 16px;
+    padding:0 16px;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .field:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,140,255,.15)}
+  .field .prefix{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:17px;
+    letter-spacing:.06em;
+    color:#5f6c7d;
+    user-select:none;
+    white-space:nowrap;
+  }
+  .field input{
+    flex:1 1 auto;
+    min-width:0;
+    background:transparent;
+    border:0;
+    color:var(--text);
+    padding:15px 0 15px 2px;
     font-size:17px;
     font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     letter-spacing:.06em;
     outline:none;
-    transition:border-color .15s, box-shadow .15s;
   }
-  input::placeholder{color:#4d5866;letter-spacing:.06em}
-  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,140,255,.15)}
+  .field input::placeholder{color:#4d5866;letter-spacing:.06em}
   button{
     width:100%;
     margin-top:16px;
@@ -137,8 +156,11 @@
       <p class="lead">Введите ключ доступа. Дальше нужно будет разрешить GitHub создать для вас приватный репозиторий — в нём и будет ваше колесо.</p>
 
       <label for="key">Ключ доступа</label>
-      <input id="key" type="text" inputmode="text" autocomplete="off" spellcheck="false"
-             placeholder="BALANSIO-XXXX-XXXX-XXXX" maxlength="23">
+      <div class="field">
+        <span class="prefix" aria-hidden="true">BALANSIO-</span>
+        <input id="key" type="text" inputmode="text" autocomplete="off" spellcheck="false"
+               placeholder="XXXX-XXXX-XXXX" maxlength="14" aria-label="Ключ доступа, 12 символов">
+      </div>
       <button id="go" type="button">Продолжить</button>
 
       <div class="msg" id="msg"></div>
@@ -188,18 +210,24 @@
   var btn = $('go');
   var msg = $('msg');
 
-  // ── Форматирование ключа: BALANSIO-XXXX-XXXX-XXXX ──
-  function formatKey(raw) {
+  // ── Форматирование тела ключа: 12 символов, группы по 4 ──
+  // Префикс «BALANSIO-» стоит в разметке отдельно, поэтому здесь его нет.
+  // Если ключ вставили целиком, лишние «BALANSIO» срезаются: в теле ключа
+  // букв I и O не бывает, спутать не с чем.
+  function formatBody(raw) {
     var s = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (s.indexOf('BALANSIO') === 0) s = s.slice(8);
+    s = s.replace(/^(BALANSIO)+/, '');
     s = s.slice(0, 12);
-    var out = s.replace(/(.{4})(?=.)/g, '$1-');
-    return s ? 'BALANSIO-' + out : '';
+    return s.replace(/(.{4})(?=.)/g, '$1-');
+  }
+
+  function bodyOf() {
+    return input.value.replace(/-/g, '');
   }
 
   input.addEventListener('input', function () {
     var atEnd = input.selectionStart === input.value.length;
-    input.value = formatKey(input.value);
+    input.value = formatBody(input.value);
     if (atEnd) input.setSelectionRange(input.value.length, input.value.length);
     hideMsg();
   });
@@ -245,12 +273,13 @@
   };
 
   function submit() {
-    var key = formatKey(input.value);
-    if (key.length !== 23) {
-      showMsg('Ключ состоит из 12 символов после BALANSIO: BALANSIO-XXXX-XXXX-XXXX.');
+    var body = bodyOf();
+    if (body.length !== 12) {
+      showMsg('В ключе 12 символов после BALANSIO-. Сейчас введено ' + body.length + '.');
       input.focus();
       return;
     }
+    var key = 'BALANSIO-' + formatBody(body);
     busy(true);
     hideMsg();
 
