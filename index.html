@@ -114,6 +114,7 @@
   .msg.show{display:block}
   .msg.error{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.3);color:#ffb3b3}
   .msg.error a{color:#ffd0d0}
+  .msg.info{background:rgba(91,140,255,.1);border:1px solid rgba(91,140,255,.3);color:#c7d5ff}
   .ok-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
   .ok-head svg{flex:0 0 auto}
   .ok-head h1{margin:0}
@@ -203,6 +204,58 @@
       <div style="margin-top:22px">
         <a class="btn" id="repo-link" href="#" target="_blank" rel="noopener">Открыть репозиторий</a>
         <a class="btn ghost" href="https://vercel.com/new" target="_blank" rel="noopener">Импорт в Vercel</a>
+      </div>
+    </div>
+
+    <!-- Шаг U1: обновление уже существующей копии -->
+    <div id="step-update" class="hidden">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"></path>
+          <path d="M20.5 4.5V10H15"></path>
+        </svg>
+      </div>
+      <h1>Обновить копию</h1>
+      <p class="lead">
+        Обновляем <code id="up-repo">—</code> до текущей версии колеса. Ваши настройки —
+        название, ссылка на Telegram, бот — останутся как есть: меняются только файлы приложения.
+      </p>
+      <button id="up-go" type="button" disabled>Обновить</button>
+      <div class="msg" id="up-msg"></div>
+      <p class="note">
+        Разрешение GitHub нужно, чтобы положить файлы в ваш репозиторий. После обновления
+        Vercel пересоберёт сайт сам — это около минуты.
+      </p>
+    </div>
+
+    <!-- Шаг U2: обновление прошло -->
+    <div id="step-updated" class="hidden">
+      <div class="ok-head">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3ecf8e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M8 12.5l2.5 2.5L16 9.5"></path>
+        </svg>
+        <h1>Копия обновлена</h1>
+      </div>
+      <p class="lead">
+        Файлы в <code id="up-done-repo">—</code> заменены на актуальные. Настройки и ссылки не тронуты.
+      </p>
+
+      <ol class="steps">
+        <li>
+          <b>Подождите минуту.</b> Vercel пересоберёт сайт автоматически. Если через пару минут
+          изменений не видно — откройте проект в Vercel, <b>Deployments</b> → верхний деплой →
+          <b>⋯</b> → <b>Redeploy</b>.
+        </li>
+        <li>
+          <b>Обновите админку.</b> В левом меню появится кнопка «Инструкция», а в ней — пошаговая
+          настройка своего бота.
+        </li>
+      </ol>
+
+      <div style="margin-top:22px">
+        <a class="btn" id="up-open-admin" href="#" target="_blank" rel="noopener">Открыть админку</a>
+        <a class="btn ghost" id="up-open-repo" href="#" target="_blank" rel="noopener">Репозиторий</a>
       </div>
     </div>
 
@@ -307,6 +360,15 @@
         }
         busy(false);
         if (data && data.reason === 'already_used') {
+          // По ключу уже есть копия — предлагаем не новую, а обновление: так
+          // копии, выпущенные до появления кнопки в админке, тоже получают новые версии.
+          if (data.update && data.repo) {
+            showUpdate(data.update, data.repo);
+            upMsg.className = 'msg show info';
+            upMsg.textContent = 'По этому ключу копия уже выдана — ' + data.repo
+              + '. Если в ней ещё нет кнопки «Инструкция» и обновления, обновите её: настройки останутся на месте.';
+            return;
+          }
           if (data.repo) {
             showMsg('По этому ключу копия уже выдана — ' + data.repo + '. Если это не вы, напишите автору.',
               { href: 'https://github.com/' + data.repo, text: 'Открыть репозиторий' });
@@ -328,6 +390,105 @@
   var repo = q.get('repo') || '';
   var name = q.get('name') || '';
 
+  // ── Обновление существующей копии ──
+  // Ссылку выдаёт админка копии: внутри подписанный репозиторий и срок, ключ не нужен.
+  // Репозиторий показываем только после проверки подписи на сервере — по подделанной
+  // ссылке чужое имя в интерфейс не попадёт.
+  var UPDATE_ERRORS = {
+    bad_update_link: 'Ссылка на обновление устарела — она живёт 30 минут. Откройте админку своей копии и нажмите «Обновить приложение» ещё раз.',
+    not_configured: 'Обновление пока не настроено на сервере. Напишите автору.',
+    no_access: 'GitHub не дал доступ к этому репозиторию. Войдите тем аккаунтом, на котором лежит копия.',
+    update_failed: 'GitHub не принял файлы. Попробуйте ещё раз через минуту.',
+    template_unavailable: 'Сервер не смог прочитать шаблон. Попробуйте через пару минут.',
+    no_code: 'GitHub не подтвердил вход. Нажмите «Обновить» ещё раз и разрешите доступ.',
+    oauth_failed: 'GitHub не подтвердил вход. Нажмите «Обновить» ещё раз и разрешите доступ.',
+    bad_state: 'Сессия обновления истекла. Нажмите «Обновить» ещё раз.',
+    no_user: 'GitHub не отдал имя аккаунта. Попробуйте ещё раз.'
+  };
+
+  function upMsgShow(text) {
+    upMsg.className = 'msg show error';
+    upMsg.textContent = text;
+  }
+
+  var updateToken = q.get('update') || '';
+  var upBtn = $('up-go');
+  var upMsg = $('up-msg');
+
+  // knownRepo приходит из проверки ключа: по уже выданному ключу репозиторий
+  // известен, и второй запрос к серверу не нужен.
+  function showUpdate(tok, knownRepo) {
+    $('step-key').classList.add('hidden');
+    $('step-update').classList.remove('hidden');
+    updateToken = tok;
+    if (knownRepo) {
+      $('up-repo').textContent = knownRepo;
+      upBtn.disabled = false;
+      return;
+    }
+    fetch(API + '?action=update-info&t=' + encodeURIComponent(tok), { method: 'GET' })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, reason: 'bad_response' }; }); })
+      .then(function (data) {
+        if (!data || !data.ok || !data.repo) {
+          upMsgShow(UPDATE_ERRORS[data && data.reason] || 'Ссылка на обновление не подошла. Откройте админку и нажмите «Обновить приложение» ещё раз.');
+          return;
+        }
+        $('up-repo').textContent = data.repo;
+        upBtn.disabled = false;
+      })
+      .catch(function () {
+        upMsgShow('Нет связи с сервером. Проверьте интернет и обновите страницу.');
+      });
+  }
+
+  if (upBtn) {
+    upBtn.addEventListener('click', function () {
+      upBtn.disabled = true;
+      upBtn.textContent = 'Готовим обновление…';
+      fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ update: updateToken })
+      })
+        .then(function (r) { return r.json().catch(function () { return { ok: false, reason: 'bad_response' }; }); })
+        .then(function (data) {
+          if (data && data.ok && data.oauth_url) {
+            window.location.href = data.oauth_url;
+            return;
+          }
+          upBtn.textContent = 'Обновить';
+          // Просроченную ссылку повторять бессмысленно, остальное — можно.
+          if (!data || data.reason !== 'bad_update_link') upBtn.disabled = false;
+          upMsgShow(UPDATE_ERRORS[data && data.reason] || 'Не получилось. Попробуйте ещё раз или напишите автору.');
+        })
+        .catch(function () {
+          upBtn.disabled = false;
+          upBtn.textContent = 'Обновить';
+          upMsgShow('Нет связи с сервером. Проверьте интернет и попробуйте снова.');
+        });
+    });
+  }
+
+  if (updateToken) {
+    showUpdate(updateToken);
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    return;
+  }
+
+  if (q.get('updated') === '1' && repo) {
+    $('step-key').classList.add('hidden');
+    $('step-updated').classList.remove('hidden');
+    $('up-done-repo').textContent = repo;
+    $('up-open-admin').href = 'https://' + (name || repo.split('/').pop()) + '.vercel.app/admin';
+    $('up-open-repo').href = 'https://github.com/' + repo;
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    return;
+  }
+
   if (q.get('ok') === '1' && repo) {
     $('step-key').classList.add('hidden');
     $('step-done').classList.remove('hidden');
@@ -345,6 +506,22 @@
   if (err) {
     var repoParam = q.get('repo') || '';
     var link = repoParam ? { href: 'https://github.com/' + repoParam, text: 'Открыть репозиторий' } : null;
+
+    // Ошибки обновления показываем в карточке обновления: поля для ключа тут ни к чему.
+    // Кнопку убираем — ссылка на обновление одноразовая и в адресе её уже нет,
+    // повторять нужно из админки копии.
+    if (err === 'no_access' || err === 'update_failed' || err === 'bad_update_link') {
+      $('step-key').classList.add('hidden');
+      $('step-update').classList.remove('hidden');
+      if (repoParam) $('up-repo').textContent = repoParam;
+      upBtn.classList.add('hidden');
+      upMsgShow(UPDATE_ERRORS[err] + ' Вернитесь в админку копии и нажмите «Обновить приложение» ещё раз.');
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+      return;
+    }
+
     if (err === 'already_used') {
       showMsg('По этому ключу копия уже выдана.', link);
     } else if (err === 'key_not_found') {
