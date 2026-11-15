@@ -159,8 +159,10 @@
       <label for="key">Ключ доступа</label>
       <div class="field">
         <span class="prefix" aria-hidden="true">BALANSIO-</span>
+        <!-- maxlength здесь вреден: браузер обрезает вставку ДО события input,
+             и от полного ключа остаётся хвост. Длину держит formatBody(). -->
         <input id="key" type="text" inputmode="text" autocomplete="off" spellcheck="false"
-               placeholder="XXXX-XXXX-XXXX" maxlength="14" aria-label="Ключ доступа, 12 символов">
+               placeholder="XXXX-XXXX-XXXX" aria-label="Ключ доступа, 12 символов">
       </div>
       <button id="go" type="button">Продолжить</button>
 
